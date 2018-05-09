@@ -1,0 +1,25 @@
+db: baishan
+table: key_1500000000000000000__
+basetable: key
+
+shard_fields:
+    - bucket_id
+    - scope
+    - key
+
+start_shard: ["1230000000000203163", u, 30/5]
+
+number_per_shard: 1000
+tolerance_of_shard: 50
+
+source_conn:
+    host: 127.0.0.1
+    port: 3306
+    user: replicator
+    passwd: passwd
+
+new_conn:
+    host: 127.0.0.1
+    user: replicator
+    passwd: passwd
+new_ports: [[3307, 2], [3308, 2]]
