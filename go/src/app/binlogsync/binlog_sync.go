@@ -15,15 +15,6 @@ import (
 	"github.com/siddontang/go-mysql/replication"
 )
 
-type Connection struct {
-	Addr     string `yaml:"Addr"` // can be ip:port or a unix socket domain
-	Host     string `yaml:"Host"`
-	Port     string `yaml:"Port"`
-	User     string `yaml:"User"`
-	Password string `yaml:"Password"`
-	DBName   string `yaml:"DBName"`
-}
-
 type DBInfo struct {
 	Conn  *sql.DB
 	Shard *DBShard
@@ -40,6 +31,37 @@ type WriteEvent struct {
 	before   map[string]interface{}
 	after    map[string]interface{}
 	nextGTID string
+}
+
+type Connection struct {
+	// Addr can be `ip:port` or an unix socket domain
+	Addr     string `yaml:"Addr"`
+	Host     string `yaml:"Host"`
+	Port     string `yaml:"Port"`
+	User     string `yaml:"User"`
+	Password string `yaml:"Password"`
+	DBName   string `yaml:"DBName"`
+}
+
+type Config struct {
+	// WorkerCnt specifies how many goroutine used to execute sql statement
+	WriteWorkerCnt int `yaml:"WriteWorkerCnt"`
+
+	SourceConn Connection `yaml:"SourceConn"`
+
+	DBConfig map[string]Connection `yaml:"DBConfig"`
+	Shards   []DBShard             `yaml:"Shards"`
+
+	TableName  string   `yaml:"TableName"`
+	TableField []string `yaml:"TableField"`
+	TableShard []string `yaml:"TableShard"`
+	TableIndex []string `yaml:"TableIndex"`
+
+	// if specifies GTIDSet, binlog file and pos will be ignored
+	GTIDSet string `yaml:"GTIDSet"`
+
+	BinlogFile string `yaml:"BinlogFile"`
+	BinlogPos  int32  `yaml:"BinlogPos"`
 }
 
 type BinlogSyncer struct {
@@ -89,8 +111,8 @@ func NewBinlogSyncer(conf *Config) *BinlogSyncer {
 		Config: *conf,
 
 		DBPool:   make(map[string]*sql.DB),
-		WriteChs: make([]chan *WriteEvent, conf.WorkerCnt),
-		CountCh:  make(chan *Result, channelCapacity*conf.WorkerCnt),
+		WriteChs: make([]chan *WriteEvent, conf.WriteWorkerCnt),
+		CountCh:  make(chan *Result, channelCapacity*conf.WriteWorkerCnt),
 
 		mutex:    &sync.Mutex{},
 		wg:       &sync.WaitGroup{},
@@ -121,7 +143,7 @@ func (bs *BinlogSyncer) Sync() {
 		return
 	}
 
-	for i := 0; i < bs.WorkerCnt; i++ {
+	for i := 0; i < bs.WriteWorkerCnt; i++ {
 		writeCh := make(chan *WriteEvent, channelCapacity)
 		bs.WriteChs[i] = writeCh
 		bs.wg.Add(1)
@@ -287,7 +309,7 @@ func (bs *BinlogSyncer) readBinlog(binlogReader *replication.BinlogStreamer) {
 			bs.shellLog.Panicf("[%s] calculate hash failed: %v", bs.SourceConn.Addr, err)
 		}
 
-		chIdx := rowHash % int64(bs.WorkerCnt)
+		chIdx := rowHash % int64(bs.WriteWorkerCnt)
 		if bs.stop {
 			break
 		}

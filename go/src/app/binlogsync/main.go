@@ -19,28 +19,6 @@ var (
 	mainWG *sync.WaitGroup
 )
 
-type Config struct {
-
-	// WorkerCnt specifies how many goroutine used to execute sql statement
-	WorkerCnt int `yaml:"WriteWorkerCnt"`
-
-	SourceConn Connection `yaml:"SourceConn"`
-
-	DBConfig map[string]Connection `yaml:"DBConfig"`
-	Shards   []DBShard             `yaml:"Shards"`
-
-	TableName  string   `yaml:"TableName"`
-	TableField []string `yaml:"TableField"`
-	TableShard []string `yaml:"TableShard"`
-	TableIndex []string `yaml:"TableIndex"`
-
-	// if specifies GTIDSet, binlog file and pos will be ignored
-	GTIDSet string `yaml:"GTIDSet"`
-
-	BinlogFile string `yaml:"BinlogFile"`
-	BinlogPos  int32  `yaml:"BinlogPos"`
-}
-
 func main() {
 
 	// set log
